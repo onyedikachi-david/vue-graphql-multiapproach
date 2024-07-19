@@ -3,7 +3,9 @@
     <h2>Fetch API Example</h2>
     <button @click="fetchPosts" :disabled="loading">Fetch Posts</button>
     <div v-if="loading" class="loading">Loading...</div>
-    <div v-else-if="error" class="error">Error: {{ error.message }}</div>
+    <div v-else-if="networkError" class="error">Error: {{ networkError }}</div>
+    <div v-else-if="graphqlError" class="error">Error: {{ graphqlError }}</div>
+    <div v-else-if="unexpectedError" class="error">Error: {{ unexpectedError }}</div>
     <ul v-else class="post-list">
       <li v-for="post in posts" :key="post.id" class="post-item">
         <h3>Post title: {{ post.title }}</h3>
@@ -28,11 +30,15 @@ interface Post {
 
 const posts = ref<Post[]>([])
 const loading = ref(false)
-const error = ref<Error | null>(null)
+const networkError = ref<string | null>(null)
+const graphqlError = ref<string | null>(null)
+const unexpectedError = ref<string | null>(null)
 
 const fetchPosts = async () => {
   loading.value = true
-  error.value = null
+  networkError.value = null
+  graphqlError.value = null
+  unexpectedError.value = null
 
   try {
     const response = await fetch('/graphql', {
@@ -57,9 +63,17 @@ const fetchPosts = async () => {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
     const result = await response.json()
-    posts.value = result.data.posts.slice(0, 4)
+    if (result.errors && result.errors.length > 0) {
+      graphqlError.value = result.errors.map((e: any) => e.message).join(', ')
+    } else {
+      posts.value = result.data.posts.slice(0, 4)
+    }
   } catch (err: any) {
-    error.value = err instanceof Error ? err : new Error(String(err))
+    if (err.message.startsWith('HTTP error!')) {
+      networkError.value = err.message
+    } else {
+      unexpectedError.value = err.message
+    }
   } finally {
     loading.value = false
   }

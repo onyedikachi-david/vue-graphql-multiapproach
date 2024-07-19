@@ -13,33 +13,46 @@ interface Post {
 
 const posts = ref<Post[]>([])
 const loading = ref(false)
-const error = ref<Error | null>(null)
+const networkError = ref<string | null>(null)
+const graphqlError = ref<string | null>(null)
+const unexpectedError = ref<string | null>(null)
 
 const fetchPosts = async () => {
   loading.value = true
-  error.value = null
+  networkError.value = null
+  graphqlError.value = null
+  unexpectedError.value = null
+
   try {
     const response = await axios.post('/graphql', {
       query: `
-                query GetPosts {
-                    posts {
-                        id
-                        title
-                        body
-                        user {
-                            name
-                        }
-                    }
-                }    
-            `
+        query GetPosts {
+          posts {
+            id
+            title
+            body
+            user {
+              name
+            }
+          }
+        }    
+      `
     })
     if (response.status !== 200) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
-    const result = await response.data
-    posts.value = result.data.posts.slice(0, 4)
-  } catch (err) {
-    error.value = err instanceof Error ? err : new Error(String(err))
+    const result = response.data
+    if (result.errors && result.errors.length > 0) {
+      graphqlError.value = result.errors.map((e: any) => e.message).join(', ')
+    } else {
+      posts.value = result.data.posts.slice(0, 4)
+    }
+  } catch (err: any) {
+    if (err.response) {
+      networkError.value = `HTTP error! status: ${err.response.status}`
+    } else {
+      unexpectedError.value = err.message
+    }
   } finally {
     loading.value = false
   }
@@ -49,9 +62,11 @@ const fetchPosts = async () => {
 <template>
   <div class="axios-example">
     <h2>Axios API Example</h2>
-    <button @click="fetchPosts">Fetch Posts</button>
+    <button @click="fetchPosts" :disabled="loading">Fetch Posts</button>
     <div v-if="loading" class="loading">Loading...</div>
-    <div v-else-if="error" class="error">Error: {{ error.message }}</div>
+    <div v-else-if="networkError" class="error">Error: {{ networkError }}</div>
+    <div v-else-if="graphqlError" class="error">Error: {{ graphqlError }}</div>
+    <div v-else-if="unexpectedError" class="error">Error: {{ unexpectedError }}</div>
     <ul v-else class="post-list">
       <li v-for="post in posts" :key="post.id" class="post-item">
         <h3>Post title: {{ post.title }}</h3>
@@ -79,6 +94,7 @@ button {
   border-radius: 4px;
   background-color: #007bff;
   color: white;
+  transition: background-color 0.3s;
 }
 
 button:disabled {

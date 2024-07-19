@@ -58,8 +58,8 @@ const fetchPosts = async () => {
     }
     const result = await response.json()
     posts.value = result.data.posts.slice(0, 4)
-  } catch (err) {
-    error.value = err
+  } catch (err: any) {
+    error.value = err instanceof Error ? err : new Error(String(err))
   } finally {
     loading.value = false
   }

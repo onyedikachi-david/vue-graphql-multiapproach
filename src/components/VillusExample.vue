@@ -1,12 +1,24 @@
 <script setup lang="ts">
 import { useQuery } from 'villus'
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 
-const posts = ref([])
+const posts = ref<Post[]>([])
 const loading = ref(false)
-const error = ref(null)
+const error = ref<Error | null>(null)
 
-const query = useQuery({
+interface Post {
+  id: number
+  title: string
+  body: string
+  user: {
+    name: string
+  }
+}
+
+interface QueryResult {
+  posts: Post[]
+}
+const query = useQuery<QueryResult>({
   query: `
     query GetPosts {
       posts {
@@ -33,7 +45,7 @@ const fetchPosts = async () => {
     } else {
       throw new Error('Posts not found in query result')
     }
-  } catch (e) {
+  } catch (e: any) {
     error.value = e
     console.error(e)
   } finally {
